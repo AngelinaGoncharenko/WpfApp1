@@ -1,0 +1,143 @@
+-- Таблица Партнеров
+CREATE TABLE Partners (
+    PartnerID INT PRIMARY KEY IDENTITY,
+    PartnerType NVARCHAR(50) NOT NULL,
+    CompanyName NVARCHAR(200) NOT NULL,
+    LegalAddress NVARCHAR(300),
+    INN NVARCHAR(20),
+    DirectorFullName NVARCHAR(100),
+    Phone NVARCHAR(20),
+    Email NVARCHAR(100),
+    Logo VARBINARY(MAX),
+    Rating FLOAT DEFAULT 0,
+    SalesPlaces NVARCHAR(MAX) -- можно JSON или CSV
+);
+
+-- История продаж партнеров
+CREATE TABLE SalesHistory (
+    SaleID INT PRIMARY KEY IDENTITY,
+    PartnerID INT NOT NULL,
+    ProductID INT NOT NULL,
+    SaleDate DATETIME NOT NULL,
+    Quantity INT NOT NULL,
+    TotalAmount DECIMAL(18,2) NOT NULL,
+    FOREIGN KEY (PartnerID) REFERENCES Partners(PartnerID),
+    FOREIGN KEY (ProductID) REFERENCES Products(ProductID)
+);
+
+-- Менеджеры
+CREATE TABLE Managers (
+    ManagerID INT PRIMARY KEY IDENTITY,
+    FullName NVARCHAR(150),
+    Login NVARCHAR(50) UNIQUE,
+    PasswordHash NVARCHAR(200)
+);
+
+-- История изменения рейтинга партнера
+CREATE TABLE PartnerRatingHistory (
+    RatingHistoryID INT PRIMARY KEY IDENTITY,
+    PartnerID INT NOT NULL,
+    ManagerID INT NOT NULL,
+    ChangeDate DATETIME NOT NULL DEFAULT GETDATE(),
+    OldRating FLOAT NOT NULL,
+    NewRating FLOAT NOT NULL,
+    Reason NVARCHAR(500),
+    FOREIGN KEY (PartnerID) REFERENCES Partners(PartnerID),
+    FOREIGN KEY (ManagerID) REFERENCES Managers(ManagerID)
+);
+
+-- Заявки от партнеров
+CREATE TABLE Orders (
+    OrderID INT PRIMARY KEY IDENTITY,
+    PartnerID INT NOT NULL,
+    ManagerID INT NOT NULL,
+    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+    Status NVARCHAR(50) NOT NULL, -- например: Created, Cancelled, AwaitingPrepayment, InProduction, ReadyForDelivery, Completed
+    PrepaymentDueDate DATETIME NULL,
+    PrepaymentReceivedAt DATETIME NULL,
+    FOREIGN KEY (PartnerID) REFERENCES Partners(PartnerID),
+    FOREIGN KEY (ManagerID) REFERENCES Managers(ManagerID)
+);
+
+-- Позиции заявки (заказываемая продукция)
+CREATE TABLE OrderItems (
+    OrderItemID INT PRIMARY KEY IDENTITY,
+    OrderID INT NOT NULL,
+    ProductID INT NOT NULL,
+    Quantity INT NOT NULL,
+    Price DECIMAL(18, 2) NOT NULL,
+    ProductionDate DATETIME NOT NULL,
+    FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
+    FOREIGN KEY (ProductID) REFERENCES Products(ProductID)
+);
+
+-- Доставка заявки
+CREATE TABLE Deliveries (
+    DeliveryID INT PRIMARY KEY IDENTITY,
+    OrderID INT NOT NULL,
+    DeliveryDate DATETIME NOT NULL,
+    DeliveryMethod NVARCHAR(100), -- "Delivery" или "Pickup"
+    IsCompleted BIT NOT NULL DEFAULT 0,
+    FOREIGN KEY (OrderID) REFERENCES Orders(OrderID)
+);
+
+-- Сотрудники
+CREATE TABLE Employees (
+    EmployeeID INT PRIMARY KEY IDENTITY,
+    FullName NVARCHAR(200) NOT NULL,
+    BirthDate DATE NOT NULL,
+    PassportData NVARCHAR(100),
+    BankDetails NVARCHAR(200),
+    HasFamily BIT NOT NULL DEFAULT 0,
+    HealthStatus NVARCHAR(500)
+);
+
+-- Допуск сотрудников к оборудованию
+CREATE TABLE EmployeeEquipmentAccess (
+    EquipmentAccessID INT PRIMARY KEY IDENTITY,
+    EmployeeID INT NOT NULL,
+    EquipmentName NVARCHAR(200) NOT NULL,
+    GrantedDate DATETIME NOT NULL DEFAULT GETDATE(),
+    IsActive BIT NOT NULL DEFAULT 1,
+    FOREIGN KEY (EmployeeID) REFERENCES Employees(EmployeeID)
+);
+
+-- Карты доступа сотрудников
+CREATE TABLE AccessCards (
+    CardID INT PRIMARY KEY IDENTITY,
+    EmployeeID INT NOT NULL,
+    CardNumber NVARCHAR(50) NOT NULL UNIQUE,
+    IssuedAt DATETIME NOT NULL DEFAULT GETDATE(),
+    IsActive BIT NOT NULL DEFAULT 1,
+    FOREIGN KEY (EmployeeID) REFERENCES Employees(EmployeeID)
+);
+
+-- Логи доступа (турникеты)
+CREATE TABLE AccessLogs (
+    AccessLogID INT PRIMARY KEY IDENTITY,
+    CardNumber NVARCHAR(50) NOT NULL,
+    AccessTime DATETIME NOT NULL DEFAULT GETDATE(),
+    DoorID NVARCHAR(100),
+    AccessGranted BIT NOT NULL
+);
+
+-- Расширение таблицы Materials для поставщиков, остатков и истории
+ALTER TABLE Materials ADD 
+    Suppliers NVARCHAR(MAX),
+    QuantityInPackage INT,
+    UnitOfMeasure NVARCHAR(20),
+    Description NVARCHAR(MAX),
+    Image VARBINARY(MAX),
+    Cost DECIMAL(18, 2),
+    QuantityInStock INT DEFAULT 0,
+    MinimumQuantity INT DEFAULT 0;
+
+-- История изменения остатков материалов
+CREATE TABLE MaterialStockHistory (
+    StockHistoryID INT PRIMARY KEY IDENTITY,
+    MaterialID INT NOT NULL,
+    ChangeDate DATETIME NOT NULL DEFAULT GETDATE(),
+    QuantityChanged INT NOT NULL,
+    Reason NVARCHAR(500),
+    FOREIGN KEY (MaterialID) REFERENCES Materials(MaterialID)
+);

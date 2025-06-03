@@ -1,0 +1,400 @@
+--CREATE TABLE table1 (
+--tID INT PRIMARY KEY IDENTITY,
+-- Ttext NVARCHAR(MAX) NULL,
+-- Ttext1 NVARCHAR(MAX) NULL,
+--);
+
+INSERT INTO table1 (Ttext, Ttext1)
+VALUES
+('Создание, редактирование и удаление + поиск','
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using DemoProect.Data;
+using DemoProect.Data.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace DemoProect
+{
+    public partial class RequestsWindow : Window
+    {
+        private readonly User _currentUser;
+        private List<Request> _allRequests;
+
+        public RequestsWindow(User currentUser)
+        {
+            InitializeComponent();
+            _currentUser = currentUser;
+            LoadRequests();
+            ConfigureUIByRole();
+        }
+
+        private void LoadRequests()
+        {
+            using var db = new ApplicationDbContext();
+            if (_currentUser.Role == "Executor")
+            {
+                // Исполнителю ничего не назначено — только пусто
+                _allRequests = new List<Request>();
+            }
+            else
+            {
+                _allRequests = db.Requests.ToList();
+            }
+
+            RequestsGrid.ItemsSource = _allRequests;
+        }
+
+        private void FilterButton_Click(object sender, RoutedEventArgs e)
+        {
+            string search = SearchBox.Text.Trim().ToLower();
+            string status = (StatusFilterBox.SelectedItem as ComboBoxItem)?.Content.ToString();
+
+            var filtered = _allRequests.Where(r =>
+                (status == "Все" || r.Status == status) &&
+                (r.RequestId.ToString().Contains(search) ||
+                 r.ClientId.ToString().Contains(search) ||
+                 r.EquipmentId.ToString().Contains(search) ||
+                 (r.ProblemDescription?.ToLower().Contains(search) ?? false))
+            ).ToList();
+
+            RequestsGrid.ItemsSource = filtered;
+        }
+
+        private void ConfigureUIByRole()
+        {
+            switch (_currentUser.Role)
+            {
+                case "Admin":
+                case "Manager":
+                    AddButton.IsEnabled = true;
+                    EditButton.IsEnabled = true;
+                    DeleteButton.IsEnabled = true;
+                    break;
+                case "Executor":
+                    AddButton.IsEnabled = false;
+                    EditButton.IsEnabled = false;
+                    DeleteButton.IsEnabled = false;
+                    break;
+            }
+        }
+
+        private void AddRequest_Click(object sender, RoutedEventArgs e)
+        {
+            var createWindow = new CreateRequestWindow();
+            if (createWindow.ShowDialog() == true)
+            {
+                LoadRequests(); // Метод для обновления DataGrid после добавления
+            }
+        }
+
+
+        private void EditRequest_Click(object sender, RoutedEventArgs e)
+        {
+            if (RequestsGrid.SelectedItem is Request selectedRequest)
+            {
+                using var db = new ApplicationDbContext();
+                var requestFromDb = db.Requests
+                    .FirstOrDefault(r => r.RequestId == selectedRequest.RequestId);
+
+                if (requestFromDb != null)
+                {
+                    var editWindow = new EditRequestWindow(db, requestFromDb);
+                    if (editWindow.ShowDialog() == true)
+                    {
+                        LoadRequests(); // Перезагружаем после редактирования
+                    }
+                }
+            }
+        }
+
+        private void DeleteRequest_Click(object sender, RoutedEventArgs e)
+        {
+            if (RequestsGrid.SelectedItem is Request selected)
+            {
+                var confirm = MessageBox.Show($"Удалить заявку #{selected.RequestId}?", "Подтверждение", MessageBoxButton.YesNo);
+                if (confirm == MessageBoxResult.Yes)
+                {
+                    using var db = new ApplicationDbContext();
+
+                    // Удаляем связанные записи в Assignments
+                    var assignmentsToDelete = db.Assignments.Where(a => a.RequestId == selected.RequestId).ToList();
+                    if (assignmentsToDelete.Any())
+                        db.Assignments.RemoveRange(assignmentsToDelete);
+
+                    // Удаляем связанные записи в RepairReports
+                    var reportsToDelete = db.RepairReports.Where(r => r.RequestId == selected.RequestId).ToList();
+                    if (reportsToDelete.Any())
+                        db.RepairReports.RemoveRange(reportsToDelete);
+
+                    // Удаляем связанные записи в Reviews
+                    var reviewsToDelete = db.Reviews.Where(r => r.RequestId == selected.RequestId).ToList();
+                    if (reviewsToDelete.Any())
+                        db.Reviews.RemoveRange(reviewsToDelete);
+
+                    // Теперь удаляем заявку
+                    var toDelete = db.Requests.Find(selected.RequestId);
+                    if (toDelete != null)
+                    {
+                        db.Requests.Remove(toDelete);
+                        db.SaveChanges();
+                        LoadRequests();
+                    }
+                }
+            }
+        }
+
+    }
+'),
+
+('Окно таблицы','
+<Window x:Class="DemoProect.RequestsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Заявки" Height="450" Width="800">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <Label Content="Поиск:" VerticalAlignment="Center"/>
+            <TextBox x:Name="SearchBox" Width="200" Margin="5,0"/>
+            <ComboBox x:Name="StatusFilterBox" Width="150" Margin="5,0">
+                <ComboBoxItem Content="Все" IsSelected="True"/>
+                <ComboBoxItem Content="в ожидании"/>
+                <ComboBoxItem Content="в работе"/>
+                <ComboBoxItem Content="выполнено"/>
+                <ComboBoxItem Content="не выполнено"/>
+            </ComboBox>
+            <Button Content="Фильтр" Click="FilterButton_Click" Margin="10,0"/>
+        </StackPanel>
+
+        <DataGrid x:Name="RequestsGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="ID" Binding="{Binding RequestID}" Width="Auto"/>
+                <DataGridTextColumn Header="Дата" Binding="{Binding RequestDate}" Width="*"/>
+                <DataGridTextColumn Header="Оборудование ID" Binding="{Binding EquipmentID}" Width="*"/>
+                <DataGridTextColumn Header="Клиент ID" Binding="{Binding ClientID}" Width="*"/>
+                <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="*"/>
+                <DataGridTextColumn Header="Описание" Binding="{Binding ProblemDescription}" Width="2*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="Создать" Click="AddRequest_Click" x:Name="AddButton" Margin="5"/>
+            <Button Content="Редактировать" Click="EditRequest_Click" x:Name="EditButton" Margin="5"/>
+            <Button Content="Удалить" Click="DeleteRequest_Click" x:Name="DeleteButton" Margin="5"/>
+        </StackPanel>
+    </Grid>
+</Window>
+')
+,
+('Создание','
+<Window x:Class="DemoProect.CreateRequestWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Создание заявки" Height="400" Width="500">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Margin="10" Grid.Row="0" VerticalAlignment="Top" HorizontalAlignment="Left">
+            <Label Content="Клиент:"/>
+            <ComboBox x:Name="ClientComboBox" DisplayMemberPath="FullName" Width="400"/>
+
+            <Label Content="Оборудование:" Margin="0,10,0,0"/>
+            <ComboBox x:Name="EquipmentComboBox" DisplayMemberPath="Name" Width="400"/>
+
+            <Label Content="Тип неисправности:" Margin="0,10,0,0"/>
+            <ComboBox x:Name="MalfunctionComboBox" DisplayMemberPath="MalfunctionName" Width="400"/>
+
+            <Label Content="Описание проблемы:" Margin="0,10,0,0"/>
+            <TextBox x:Name="ProblemTextBox" Height="60" Width="400" TextWrapping="Wrap" AcceptsReturn="True"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Grid.Row="2" Margin="0,10,0,0">
+            <Button Content="Сохранить" Click="SaveButton_Click" Width="100" Margin="0,0,10,0"/>
+            <Button Content="Отмена" Click="CancelButton_Click" Width="100"/>
+        </StackPanel>
+    </Grid>
+</Window>
+
+using System;
+using System.Linq;
+using System.Windows;
+using DemoProect.Data.Models; // или твой namespace с ApplicationDbContext
+
+namespace DemoProect
+{
+    public partial class CreateRequestWindow : Window
+    {
+        private readonly ApplicationDbContext _context = new();
+
+        public CreateRequestWindow()
+        {
+            InitializeComponent();
+            LoadData();
+        }
+
+        private void LoadData()
+        {
+            ClientComboBox.ItemsSource = _context.Clients.ToList();
+            EquipmentComboBox.ItemsSource = _context.Equipment.ToList();
+            MalfunctionComboBox.ItemsSource = _context.MalfunctionTypes.ToList();
+        }
+
+        private void SaveButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ClientComboBox.SelectedItem is not Client client ||
+                EquipmentComboBox.SelectedItem is not Equipment equipment ||
+                MalfunctionComboBox.SelectedItem is not MalfunctionType malfunction ||
+                string.IsNullOrWhiteSpace(ProblemTextBox.Text))
+            {
+                MessageBox.Show("Пожалуйста, заполните все поля.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            var newRequest = new Request
+            {
+                ClientId = client.ClientId,
+                EquipmentId = equipment.EquipmentId,
+                MalfunctionTypeId = malfunction.MalfunctionTypeId,
+                ProblemDescription = ProblemTextBox.Text,
+                RequestDate = DateOnly.FromDateTime(DateTime.Now),
+                Status = "в ожидании"
+            };
+
+            _context.Requests.Add(newRequest);
+            _context.SaveChanges();
+
+            MessageBox.Show("Заявка успешно добавлена!", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
+            DialogResult = true;
+            Close();
+        }
+
+        private void CancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+    }
+')
+,
+('Редактирование','
+<Window x:Class="DemoProect.EditRequestWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Редактировать заявку" Height="300" Width="400">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Margin="0,0,0,10">
+            <TextBlock Text="Описание проблемы:"/>
+            <TextBox x:Name="ProblemTextBox" Height="60" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Margin="0,0,0,10">
+            <TextBlock Text="Тип неисправности:"/>
+            <ComboBox x:Name="MalfunctionComboBox"
+          DisplayMemberPath="MalfunctionName"
+          SelectedValuePath="MalfunctionTypeId"/>
+
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Margin="0,0,0,10">
+            <TextBlock Text="Статус:"/>
+            <ComboBox x:Name="StatusComboBox">
+                <ComboBoxItem Content="в ожидании"/>
+                <ComboBoxItem Content="в работе"/>
+                <ComboBoxItem Content="выполнено"/>
+                <ComboBoxItem Content="не выполнено"/>
+            </ComboBox>
+        </StackPanel>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="Сохранить" Width="80" Click="SaveButton_Click" Margin="0,0,10,0"/>
+            <Button Content="Отмена" Width="80" Click="CancelButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
+
+using System.Windows;
+using System.Linq;
+using DemoProect.Data.Models;
+using System.Windows.Controls;
+
+namespace DemoProect
+{
+    public partial class EditRequestWindow : Window
+    {
+        private readonly ApplicationDbContext _context;
+        private readonly Request _request;
+
+        public EditRequestWindow(ApplicationDbContext context, Request request)
+        {
+            InitializeComponent();
+            _context = context;
+            _request = request;
+
+            // Заполнение
+            ProblemTextBox.Text = _request.ProblemDescription;
+
+            // Подгружаем типы неисправностей
+            MalfunctionComboBox.ItemsSource = _context.MalfunctionTypes.ToList();
+            MalfunctionComboBox.SelectedValue = _request.MalfunctionTypeId;
+
+            // Выставляем статус
+            StatusComboBox.SelectedItem = StatusComboBox.Items
+                .OfType<ComboBoxItem>()
+                .FirstOrDefault(i => i.Content.ToString() == _request.Status);
+        }
+
+        private void SaveButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_request == null || _context == null)
+            {
+                MessageBox.Show("Ошибка при сохранении: заявка не загружена.");
+                return;
+            }
+
+            if (MalfunctionComboBox.SelectedValue == null)
+            {
+                MessageBox.Show("Выберите тип неисправности.");
+                return;
+            }
+
+            if (StatusComboBox.SelectedItem is not ComboBoxItem selectedStatusItem)
+            {
+                MessageBox.Show("Выберите статус.");
+                return;
+            }
+
+            _request.ProblemDescription = ProblemTextBox.Text;
+            _request.MalfunctionTypeId = (int)MalfunctionComboBox.SelectedValue;
+            _request.Status = selectedStatusItem.Content.ToString();
+
+            _context.SaveChanges();
+
+            this.DialogResult = true;
+            this.Close();
+        }
+
+
+        private void CancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            this.DialogResult = false;
+            this.Close();
+        }
+    }
+');

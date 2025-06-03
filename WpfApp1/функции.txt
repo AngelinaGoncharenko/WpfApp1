@@ -1,0 +1,185 @@
+--CREATE DATABASE TestingBd
+
+CREATE TABLE UsersDB(
+UserId INT PRIMARY KEY IDENTITY,
+LoginName VARCHAR(50) NOT NULL,
+PasswordName VARCHAR(50) NOT NULL,
+);
+
+ALTER TABLE UsersDB
+ALTER COLUMN PasswordName NVARCHAR(MAX);
+
+ALTER TABLE UsersDB
+ALTER COLUMN LoginName NVARCHAR(MAX);
+
+INSERT INTO UsersDB (LoginName,PasswordName) 
+VALUES
+('Создание таблицы','
+CREATE TABLE Requests (
+    RequestID INT PRIMARY KEY IDENTITY,
+    RequestDate DATE NOT NULL,
+    EquipmentID INT NOT NULL,
+    MalfunctionTypeID INT NOT NULL,
+    ProblemDescription NVARCHAR(500),
+    ClientID INT NOT NULL,
+    Status NVARCHAR(50) NOT NULL CHECK (Status IN (в ожидании, в работе, выполнено, не выполнено)),
+    FOREIGN KEY (EquipmentID) REFERENCES Equipment(EquipmentID),
+    FOREIGN KEY (MalfunctionTypeID) REFERENCES MalfunctionTypes(MalfunctionTypeID),
+    FOREIGN KEY (ClientID) REFERENCES Clients(ClientID)
+);
+'),
+('Заполнение записей из ms sql','
+INSERT INTO Requests (RequestDate, EquipmentID, MalfunctionTypeID, ProblemDescription, ClientID, Status) VALUES
+(2025-06-01, 1, 1, NПринтер не печатает с компьютера, 1, Nв ожидании),
+(2025-06-02, 2, 3, NМонитор периодически мерцает, 2, Nв работе);
+'),
+('Подключение в VS','
+Scaffold-DbContext "Server=[ИМЯ СЕРВЕРА];Database=[ИМЯ БАЗЫ ДАННЫХ];User Id=[ИМЯ ПОЛЬЗОВАТЕЛЯ];Password=[ПАРОЛЬ];TrustServerCertificate=True;" Microsoft.EntityFrameworkCore.SqlServer -OutputDir Data\Models -Context ApplicationDbContext -f
+'),
+('Изменение таблицы','
+ALTER TABLE UsersDB
+ALTER COLUMN PasswordName NVARCHAR(MAX);');
+
+CREATE TABLE TestData (
+TestId INT PRIMARY KEY IDENTITY,
+Text VARCHAR(255) NULL,
+UserId INT,
+FOREIGN KEY (UserId) REFERENCES UsersDB(UserId),
+);
+
+INSERT INTO UsersDB (LoginName,PasswordName) 
+VALUES
+('моя строка подключения','Scaffold-DbContext "Server=DESKTOP-PF93MTG;Database=DatabEquipment;Trusted_Connection=True;TrustServerCertificate=True;" Microsoft.EntityFrameworkCore.SqlServer -OutputDir Data\Models -Context ApplicationDbContext -f');
+
+CREATE TABLE InterF(
+TableId INT PRIMARY KEY IDENTITY,
+NameX VARCHAR(MAX) NULL,
+Description VARCHAR(MAX) NULL
+);
+
+INSERT INTO InterF (NameX,Description)
+VALUES
+('<TextBlock x:Name="ErrorTextBlock" Margin="0,5"/>',
+'<TextBlock Text="Логин: " Margin = "10"/>
+<TextBox x:Name="LoginTextBox" Margin = "10"/>'),
+('Окно заявок из моего проекта','
+<Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <Label Content="Поиск:" VerticalAlignment="Center"/>
+            <TextBox x:Name="SearchBox" Width="200" Margin="5,0"/>
+            <ComboBox x:Name="StatusFilterBox" Width="150" Margin="5,0">
+                <ComboBoxItem Content="Все" IsSelected="True"/>
+                <ComboBoxItem Content="в ожидании"/>
+                <ComboBoxItem Content="в работе"/>
+                <ComboBoxItem Content="выполнено"/>
+                <ComboBoxItem Content="не выполнено"/>
+            </ComboBox>
+            <Button Content="Фильтр" Click="FilterButton_Click" Margin="10,0"/>
+        </StackPanel>
+
+        <DataGrid x:Name="RequestsGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="ID" Binding="{Binding RequestID}" Width="Auto"/>
+                <DataGridTextColumn Header="Дата" Binding="{Binding RequestDate}" Width="*"/>
+                <DataGridTextColumn Header="Оборудование ID" Binding="{Binding EquipmentID}" Width="*"/>
+                <DataGridTextColumn Header="Клиент ID" Binding="{Binding ClientID}" Width="*"/>
+                <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="*"/>
+                <DataGridTextColumn Header="Описание" Binding="{Binding ProblemDescription}" Width="2*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="Создать" Click="AddRequest_Click" x:Name="AddButton" Margin="5"/>
+            <Button Content="Редактировать" Click="EditRequest_Click" x:Name="EditButton" Margin="5"/>
+            <Button Content="Удалить" Click="DeleteRequest_Click" x:Name="DeleteButton" Margin="5"/>
+        </StackPanel>
+    </Grid>
+');
+
+INSERT INTO UsersDB (LoginName,PasswordName) 
+VALUES
+('1','1');
+
+CREATE TABLE AvtoRiz(
+Zid INT PRIMARY KEY IDENTITY,
+NameZ VARCHAR(MAX) NULL,
+TextZ VARCHAR(MAX) NULL
+);
+
+INSERT INTO AvtoRiz(NameZ, TextZ)
+VALUES
+('Окно авторизации(интерфейс)','Title="Окно авторизации пользователя" Height="400" Width="300">
+    <StackPanel Margin="10">
+        <TextBlock Text="Логин: " Margin = "10"/>
+        <TextBox x:Name="LoginTextBox" Margin = "10"/>
+
+        <TextBlock Text="Пароль: " Margin = "10"/>
+        <PasswordBox x:Name="PasswordBox" Margin = "10"/>
+
+        <Button Content="Войти" Click="Button_OpenApp"/>
+
+        <TextBlock x:Name="ErrorTextBlock" Margin="0,5"/>
+
+        <Button Content="Закрыть приложение" Margin="30" Click="Button_CloseApp" />
+    </StackPanel>'),
+    ('Окно авторизации','using System.Linq;
+using System.Windows;
+using WpfApp1.Data;
+using WpfApp1.Data.Models;
+
+namespace WpfApp1
+{
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        public MainWindow()
+        {
+            InitializeComponent();
+        }
+
+        private void Button_OpenApp(object sender, RoutedEventArgs e)
+        {
+            string login = LoginTextBox.Text.Trim();
+            string password = PasswordBox.Password;
+
+            using var db = new ApplicationDbContext();
+            var user = db.UsersDbs.FirstOrDefault(u => u.LoginName == login && u.PasswordName == password);
+
+            if (user != null)
+            {
+                var wWindow = new Window1(user);
+                wWindow.Show();
+            }
+            else { ErrorTextBlock.Text = "Неверные данные для входа"; }
+        }
+
+        private void Button_CloseApp(object sender, RoutedEventArgs e)
+        {
+            this.Close();
+        }
+    }
+}'),
+    ('Как передать даные в другое окно','private UsersDb _user;
+
+        public Window1(UsersDb user)
+        {
+            InitializeComponent();
+
+            _user = user;
+
+            if (_user.LoginName == "1")
+            {
+                MessageBox.Show("Доступ отклонен!");
+                this.Close();
+            }
+            else { WelcomeTextBlock.Text = $"Добро пожаловать, {_user.LoginName}!"; }
+
+        }');
